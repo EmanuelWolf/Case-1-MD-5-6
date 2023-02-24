@@ -1,260 +1,518 @@
 
-# Passo a passo de construção
+## Sobre o projeto
 
-1. `npm init -y` para inicar o npm
-2. `npm install cors express sqlite3`
-3. `npm install --save-dev nodemon` Para instalar como dependência de desenvolvimento
-4. Adicionar no package.json o seguinte script:
+Projeto desenvovidocom intuito de fazer listagem. O site foi desenvolvido com ReactJS e React Bootstrap. 
 
+## Pré-requisitos
+
+- [Node.js](https://nodejs.org/en/) (na versão 16 ou superior)
+- [NPM](https://www.npmjs.com/)
+
+## Como executar?
+```bash
+npm install
+npm run dev
 ```
-  "scripts": {
-    "start": "nodemon ./src/server.js",
-  },
+
+## Passo a passo do desenvolvimento
+
+### 1. Criar o projeto
+
+```bash
+npm create vite@latest estudoapp-site --template react
 ```
 
-5. Criar arquivo `app.js` dentro de `src` com as configurações básicas do projeto:
+### 2. Instalar as dependências
+
+```bash
+cd estudoapp-site
+npm install react-bootstrap bootstrap
+npm install react-router-dom
+```
+
+### Importar css do bootstrap
+
+Adicione a seguinte linha em seu `main.jsx`:
 
 ```js
-  import express from 'express'
-  import cors from 'cors'
-
-  // instanciando o servidor
-  const app = express()
-
-  // configurando o servidor para receber requisições com o corpo no formato JSON
-  app.use(express.json())
-
-  // configurando o servidor para receber requisições qualquer origem
-  app.use(cors())
-
-  export default app
+import 'bootstrap/dist/css/bootstrap.min.css'
 ```
 
-6. Criar arquivo `server.js` para iniciar o servidor usando as configurações do `app.js`:
+Adicione a seguinte linha em seu `index.html`:
 
 ```js
-  import app from './app.js'
-
-  // escolhendo a porta em que o servidor será aberto
-  const port =  3000
-
-  // abrindo o servidor na porta escolhida
-  app.listen(port, ()=>{
-    console.log(`Server rodando em http://localhost:${port}/`)
-  })
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css"
+    integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous" />
+    
 ```
 
-7. Criar arquivo `db.js` dentro de uma pasta com nome de `infra` para fazer a configuração do sqlite:
+###  3. Excluir arquivos que não serão utilizados
+Exclua os arquivos de configuração inicial do vite, deixando apenas uma div no arquivo App.jsx
+
+
+### 4. Criando o servidor
+Crie a pasta api, e dentro inclua um arquivo com as rotas que foram criadas em sua api. Criando funções para cada ação do back-end.
 
 ```js
-  import sqlite3 from 'sqlite3'
 
-  sqlite3.verbose()
-  const db = new sqlite3.Database('./src/infra/database.db')
+onst ContentsApi = () => {
+  const url = 'http://localhost:3000'
 
-  export default db;
-```
-
-8. Criar arquivo `contents.js` dentro de infra para criar a tabela de conteúdos:
-
-```js
-    /*
-  Esse arquivo deve ser executado apenas uma vez para que a tabela do banco seja criada
-  */
-  import db from "./db.js";
-
-  //==== Conteúdos
-  const CONTENTS_SCHEMA = `
-  CREATE TABLE IF NOT EXISTS "conteudos" (
-      "ID" INTEGER PRIMARY KEY AUTOINCREMENT,
-      "TITULO" varchar(64),
-      "DESCRICAO" varchar(64),
-      "PORCENTAGEM" INTEGER
-    );`;
-
-  function createTableContents() {
-      db.run(CONTENTS_SCHEMA, (error)=> {
-        if (error) console.log("Erro ao criar tabela de conteúdos");
-      });
-  }
-
-  db.serialize( ()=> {
-      createTableContents();
-  });
-```
-
-9. Agora para rodar esse script vamos importá-lo no arquivo `server.js` logo antes do nosso `app.listen`:
-
-```js
-  import './infra/contents.js'
-```
-
-10. Dentro de uma pasta com o nome de `controllers` vamos criar o arquivo `contentsController.js` com uma estrutura básica:
-
-```js
-  class contentsController {
-    static rotas(app){
-      app.get('/conteudo', contentsController.listar)
-      app.post('/conteudo', contentsController.inserir)
-    }
-
-    static async listar(req, res){
-      console.log('a')
-    }
-
-    static async inserir(req, res){
-      console.log('b')
-    }
-  }
-
-  export default contentsController
-```
-
-11. Dentro do arquivo `app.js` vamos importar nosso controller chamando o método `rotas` para registrar as rotas iniciais da nossa aplicação:
-
-```js
-  import contentsController from './controllers/contentsController.js'
-
-  contentsController.rotas(app)
-```
-
-12. Agora precisamos fazer as ações desses métodos no banco. Vamos criar um arquivo chamadao `ContentsDAO` dentro de uma pasta chamada DAO, com as ações de listar e criar conteúdo:
-
-```js
-  import db from '../infra/db.js'
-
-  class ContentsDAO {
-      static listar() {
-          const query = 'SELECT * FROM conteudos';
-          return new Promise((resolve, reject) => {
-              db.all(query, (err, rows) => {
-                  if (err) {
-                      reject(err);
-                  }
-
-                  resolve(rows)
-              });
-          });
-      }
-
-      static inserir(conteudo) {
-        const query = 'INSERT INTO conteudos (titulo, descricao, porcentagem) VALUES (?, ?, ?)';
-        return new Promise((resolve, reject) => {
-            db.run(query, [conteudo.titulo, conteudo.descricao, conteudo.porcentagem], function (err) {
-                if (err) {
-                    reject({
-                        mensagem: 'Erro ao inserir o conteúdo',
-                        erro: err
-                    })
-                }
-
-                resolve({
-                    mensagem: 'Conteúdo criado com sucesso',
-                    data: this.lastID
-                 })
-            });
-        });
-    }
-  }
-
-  export default ContentsDAO;
-```
-
-13. Agora com esses métodos de ação no banco só precisamos chamar eles no controller, e vamos fazer desta maneira:
-
-```js
-  static async listar(req, res){
-    const conteudos = await ContentsDAO.listar()
-
-    res.send(conteudos)
-  }
-
-  static async inserir(req, res){
-    const conteudo = {
-      titulo: req.body.titulo,
-      descricao: req.body.descricao,
-      porcentagem: req.body.porcentagem
-    }
-
-    const result = await ContentsDAO.inserir(conteudo)
-
-    if(result.erro) {
-      res.status(500).send(result)
-    }
-
-    res.send(result)
-  }
-```
-
-14. Agora vamos fazer a deleção e atualização no nosso `ContentsDAO.js`:
-
-```js
-  static deletar(id) {
-    const query = 'DELETE FROM conteudos WHERE id = ?';
-    return new Promise((resolve, reject) => {
-        db.run(query, [id], (err) => {
-            if (err) {
-                reject({
-                    mensagem: 'Erro ao deletar o conteúdo',
-                    erro: err
-                })
+  return {
+      getContents () {
+          return fetch(`${url}/conteudo`, {
+              method: 'GET',
+              headers: {
+                  'Content-Type': 'application/json'
+              }
+          })
+      },
+      createContent (titulo, descricao, porcentagem) {
+        return fetch(`${url}/conteudo`, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(
+            {
+              titulo: titulo,
+              descricao: descricao,
+              porcentagem: porcentagem
             }
-
-            resolve({ mensagem: 'Conteúdo deletado com sucesso' })
-        });
-    });
+          )
+       })
+      },
   }
+}
 
-  static atualizar(id, conteudo) {
-    const query = 'UPDATE conteudos SET titulo = ?, descricao = ?, porcentagem = ? WHERE id = ?';
-    return new Promise((resolve, reject) => {
-        db.run(query, [conteudo.titulo, conteudo.descricao, conteudo.porcentagem, id], (err) => {
-            if (err) {
-                reject({
-                    mensagem: 'Erro ao atualizar o conteúdo',
-                    erro: err
-                })
-            }
-
-            resolve({ mensagem: 'Conteúdo atualizado com sucesso' })
-        });
-    });
-  }
+export default ContentsApi
 ```
 
-15. Com esses métodos que se comunicam com o banco já feitos, precisamos chamar eles no controller:
+### 5. Cria função para retorno de conteúdo do database
+No arquivo App.jsx, crie um useEffect para fazer a chamada para rota get da api e listar o conteúdo salvo.
+Antes crie um useState para salvar valores recebidos da api.
+Exemplo:
 
 ```js
-  static async deletar(req, res){
-    const conteudo = await ContentsDAO.deletar(req.params.id)
+const [contents, setContents] = useState()
 
-    if(conteudo.erro){
-        res.status(500).send('Erro ao deletar o conteúdo')
+  useEffect(() => {
+    async function getData() {
+      await ContentsApi().getContents().then(data => {
+        return data.json()
+      })
+      .then(data => {
+        setContents(data)
+      })
     }
 
-    res.send({mensagem: 'Conteúdo removido com sucesso'})
-  }
+    getData()
+  }, [])
 
-  static async atualizar(req, res){
-    const conteudo = {
-      titulo: req.body.titulo,
-      descricao: req.body.descricao,
-      porcentagem: req.body.porcentagem
-    }
+```
+### 6. Listagem dos valores recebidos
 
-    const result = await ContentsDAO.atualizar(req.params.id, conteudo)
+Importe da biblioteca `react-bootstrap` os compnentes Table, Container e Button:
+```js
+import { Table, Container } from 'react-bootstrap'
 
-    if(result.erro){
-        res.status(500).send('Erro ao atualizar o conteúdo')
-    }
+```
+No return do arquivo, primeiro chame o componente `Container` e dentro dele utilize os outros companentes importados:
+Exemplo:
 
-    res.send({mensagem: 'Conteúdo alterado com sucesso'})
-  }
+```jsx
+<Container>
+       <Table striped bordered hover>
+        <thead>
+          <tr>
+            <th>Titulo</th>
+             <th>Descrição</th>
+              <th>Porcentagem</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {contents && contents.map(cont => (
+            <tr key={cont.id}>
+              <td>{cont.titulo}</td>
+              <td>{cont.descricao}</td>
+              <td>{cont.porcentagem}</td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+</Container>
 ```
 
-16. Agora para conseguirmos usar esses métodos precisamos adicionar essas rotas lá no método `rotas` do nosso controller:
+###  7. Criando Modal para criação de conteúdo
+
+Crie a pasta components, e um arquivo `createModal.jsx`. Importe os componentes Modal, Button e Form da biblioteca `react-bootstrap`.
 
 ```js
-  app.delete('/conteudo/:id', contentsController.deletar)
-  app.put('/conteudo/:id', contentsController.atualizar)
+import { Modal, Button, Form } from 'react-bootstrap'
 ```
+
+ No retorno do arquivo, crie uma div para envolver os componentes. Após chame primeiramente o componente `Modal`, dentro dele o `Form` e dentro dele organize os componentes `Modal.Header`, `Modal.Body`, `Modal.Title`, `Form.Group`, `Form.Label`, conforme o layout que você deseja para seu modal.
+
+Exemplo:
+
+```js
+<div
+    className="modal show"
+    style={{ display: 'block', position: 'initial' }}
+    >
+      <Modal show={props.isModalOpen}>
+        <Form onSubmit={(event) => {
+          props.createContent(event)
+        }}>
+        <Modal.Header closeButton onClick={props.handleClose}>
+          <Modal.Title>Criar Conteúdo</Modal.Title>
+        </Modal.Header>
+
+        <Modal.Body>
+          <Form.Group controlId="titulo">
+            <Form.Label>
+              Titulo
+            </Form.Label>
+            <Form.Control type="text" />
+          </Form.Group>
+
+          <Form.Group controlId="descricao">
+            <Form.Label>
+              Descrição
+            </Form.Label>
+            <Form.Control type="text" />
+          </Form.Group>
+
+          <Form.Group controlId="porcentagem">
+            <Form.Label>
+              Porcentagem
+            </Form.Label>
+            <Form.Control type="number" />
+          </Form.Group>
+        </Modal.Body>
+
+        <Modal.Footer>
+          <Button variant="secondary" onClick={props.handleClose}>Close</Button>
+          <Button variant="primary" type="submit">Salvar</Button>
+        </Modal.Footer>
+        </Form>
+      </Modal >
+    </div>
+```
+
+### 8. Criando Modal para atualização de conteúdo
+
+Dentro da pasta components, crie um novo arquivo `updateModal.jsx`. Importe os componentes Modal, Button e Form da biblioteca `react-bootstrap`. 
+```js
+import { Modal, Button, Form } from 'react-bootstrap'
+
+```
+No retorno do arquivo, crie uma div para envolver os componentes. Após chame primeiramente o componente `Modal`, dentro dele o `Form` e dentro dele organize os componentes `Modal.Header`,`Modal.Body`, `Modal.Title`, `Form.Group`, `Form.Label`, conforme o layout que você deseja para seu modal. Dentro do campo de `Form.Control`, crie a propriedade defaultValue, para receber, via props, os valores atuais do campo que deseja alterar.
+
+Exemplo:
+```js
+ <div
+      className="modal show"
+      style={{ display: 'block', position: 'initial' }}
+    >
+      <Modal show={props.isModalOpen}>
+        <Form onSubmit={(event) => {
+          props.updateContent(event)
+        }}>
+        <Modal.Header closeButton onClick={props.handleClose}>
+          <Modal.Title>Atualizar Conteúdo</Modal.Title>
+        </Modal.Header>
+
+        <Modal.Body>
+          <Form.Group controlId="titulo">
+            <Form.Label>
+              Titulo
+            </Form.Label>
+            <Form.Control defaultValue={props.content.titulo} type="text" />
+          </Form.Group>
+
+          <Form.Group controlId="descricao">
+            <Form.Label>
+              Descrição
+            </Form.Label>
+            <Form.Control defaultValue={props.content.descricao} type="text" />
+          </Form.Group>
+
+          <Form.Group controlId="porcentagem">
+            <Form.Label>
+              Porcentagem
+            </Form.Label>
+            <Form.Control defaultValue={props.content.porcentagem} type="number" />
+          </Form.Group>
+        </Modal.Body>
+
+        <Modal.Footer>
+          <Button variant="secondary" onClick={props.handleClose}>Close</Button>
+          <Button variant="primary" type="submit">Salvar</Button>
+        </Modal.Footer>
+        </Form>
+      </Modal >
+    </div> 
+```
+### 9. Incluindo modal de criação no arquivo App.js
+
+Importe os componentes criados.
+ ```js
+import CreateContentModal from './components/CreateContentModal'
+import UpdateContentModal from './components/UpdateContentModal'
+
+ ```
+
+Crie states para controlar a abertura e fechamento de modal de criação, sempre com estado inicial false.
+
+```js
+const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+```
+
+Crie funções para gerir state do modal de creação:
+```js
+  const handleCloseCreateModal = () => setIsCreateModalOpen(false);
+  const handleShowCreateModal = () => setIsCreateModalOpen(true);
+```
+
+Crie uma função para chamar endpoint de criação de conteúdo, atualizar conteúdo da tela e alterar estado do modal:
+
+```js
+  async function createContent(event) {
+    try {
+      event.preventDefault()
+
+      const req = event.currentTarget.elements
+
+      await ContentsApi().createContent(
+        req.titulo.value, req.descricao.value, Number(req.porcentagem.value)
+      ).then(data => {
+        return data.json()
+      }).then(res => {
+        setContents([...contents, {
+          id: res.contentId,
+          titulo: req.titulo.value,
+          descricao: req.descricao.value,
+          porcentagem: Number(req.porcentagem.value)
+        }])
+
+        setIsCreateModalOpen(false)
+      })
+    } catch(err) {
+      throw err
+    }
+  }
+```
+
+No retorno do arquivo, inclua um fragment para envolver todos os componentes retornados. Depois da abertura do fragmente inclua o componente `Button` para criação de conteúdo. Após o fechamento do componente `Container` importe o componente `CreateModal`. Passe o state que gerencia o fechamento e abertura de modal na propriedade `isModalOpen`, a função de que faz o fechamento no modal na propriedade `handleClose` e a função que faz a criação de conteúdo na propriedade `createContent`:
+
+```js
+<>
+    <Button
+    className="mb-2"
+    variant='primary'>
+    Criar Conteúdo
+    </Button>
+    <Conatiner>
+        ...
+    </Container>
+    <CreateModal isModalOpen={isCreateModalOpen} handleClose={handleCloseCreateModal} createContent={createContent} />
+<>
+```
+### 10. Deleção de content
+
+Crie uma função para chamar endpoit de deleção de conteúdo, gerir conteúdos listados:
+
+```js
+  async function deleteContent(contentId) {
+    try {
+      await ContentsApi().deleteContent(contentId)
+
+      const formattedContents = contents.filter(cont => {
+        if(cont.id !== contentId){
+          return cont
+        }
+      })
+
+      setContents(formattedContents)
+    } catch(err) {
+      throw err
+    }
+  }
+  ```
+
+
+Dentro da tag `tr`, crie um item para ações e inclua o componente `Button` com o evento `onClick` apontando para função deleção criada anteriormente.
+
+```jsx
+<Container>
+      <Button
+        className="mb-2"
+        variant='primary'>
+        Criar Conteúdo
+      </Button>
+       <Table striped bordered hover>
+        <thead>
+          <tr>
+            <th>Titulo</th>
+             <th>Descrição</th>
+              <th>Porcentagem</th>
+              <th> 
+                     <Button onClick={() => deleteContent(cont.id)} variant='danger'>
+                  Excluir
+                </Button>
+              </th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {contents && contents.map(cont => (
+            <tr key={cont.id}>
+              <td>{cont.titulo}</td>
+              <td>{cont.descricao}</td>
+              <td>{cont.porcentagem}</td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+</Container>
+```
+### 11. Atualização de conteúdo
+
+Importe componente modal de atualização de conteúdo.
+
+```js
+import UpdateModal from './components/UpdateContentModal'
+
+```
+
+Crie um state para controlar a abertura e fechamento de modal de atualização, sempre com estado inicial false.
+
+```js
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false)
+```
+
+Crie um state para salvar o conteúdo que será atualizado
+
+```js
+  const [selectedContent, setSelectedContent] = useState()
+```
+
+Crie funções para gerir state do modal de atualização de conteúdo:
+```js
+  const handleCloseUpdateModal = () => setIsUpdateModalOpen(false);
+  const handleShowUpdateModal = () => setIsUpdateModalOpen(true);
+```
+
+Crie uma função para chamar endpoint de atualização de conteúdo.
+
+```js
+
+  async function updateContent(event) {
+    try {
+      event.preventDefault()
+
+      const req = event.currentTarget.elements
+
+      await ContentsApi().updateContent(
+        selectedContent.id, req.titulo.value, req.descricao.value, Number(req.porcentagem.value)
+      )
+
+      const formattedContents = contents.map(cont => {
+        if(cont.id === selectedContent.id) {
+          return {
+            id: selectedContent.id,
+            titulo:  req.titulo.value,
+            descricao: req.descricao.value,
+            porcentagem: Number(req.porcentagem.value)
+          }
+        }
+
+        return cont
+      })
+
+      setContents(formattedContents)
+
+      setIsUpdateModalOpen(false)
+    } catch(err) {
+      throw err
+    }
+  }
+```
+
+Dentro da tag de ações, criada no item anterior, inclua mais um componente `Button` com o evento `onClick` apontando para função de atualização de conteúdo. Assim, será possível a abetura do  modal e atualização do conteúdo
+
+```js
+    <>
+    <Container
+      className="
+        d-flex
+        flex-column
+        align-items-start
+        justify-content-center
+        h-100
+        w-100
+        "
+    >
+      <Button
+        className="mb-2"
+        onClick={handleShowCreateModal}
+        variant='primary'>
+        Criar Conteúdo
+      </Button>
+      <Table striped bordered hover>
+        <thead>
+          <tr>
+            <th>Titulo</th>
+            <th>Descrição</th>
+            <th>Porcentagem</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {contents && contents.map(cont => (
+            <tr key={cont.id}>
+              <td>{cont.titulo}</td>
+              <td>{cont.descricao}</td>
+              <td>{cont.porcentagem}</td>
+              <td>
+                <Button onClick={() => deleteContent(cont.id)} variant='danger'>
+                  Excluir
+                </Button>
+                <Button
+                  onClick={() => {
+                    handleShowUpdateModal()
+                    setSelectedContent(cont)
+                  }}
+                  variant='warning'
+                  className='m-1'
+                  >
+                  Atualizar
+                </Button>
+              </td>
+
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+    </Container>
+    <CreateContentModal isModalOpen={isCreateModalOpen} handleClose={handleCloseCreateModal} createContent={createContent} />
+```
+Inclua após o componente `Container`, o componente modal para atualização do conteúdo. Passe o state que gerencia o fechamento e abertura de modal na propriedade `isModalOpen`, a função de que faz o fechamento no modal de update na propriedade `handleClose` e o conteúdo a ser atualizado na propriedade `content`:
+
+```js
+    <>
+    <Container >
+      ...
+    </Container>
+...
+    {selectedContent && (
+      <UpdateModal isModalOpen={isUpdateModalOpen} handleClose={handleCloseUpdateModal} updateContent={updateContent} content={selectedContent} />
+    )}
+    </>
+```
+
+
+
